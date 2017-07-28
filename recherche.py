@@ -7,6 +7,7 @@ import os
 import sqlite3
 import sys
 import json
+import exifread
 
 def init():
     """
@@ -16,7 +17,7 @@ def init():
     db = sqlite3.connect("Fichiers.s3db")
     cur = db.cursor()
 
-    SQL = "CREATE TABLE Fichiers (Chemin TEXT, MD5 TEXT)"
+    SQL = "CREATE TABLE Fichiers (Chemin TEXT, MD5 TEXT, Date TEXT)"
     # On lance la requête, qui lève une exception si la table existe déjà
     try:
         cur.execute(SQL)
@@ -35,7 +36,26 @@ def md5(fname):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
 
-SQL = "INSERT INTO Fichiers VALUES (?, ?)"
+SQL = "INSERT INTO Fichiers VALUES (?, ?, ?)"
+
+def date(fichier):
+    print("Recherche de la date pour '{}'".format(fichier))
+    
+    with open(fichier, 'rb') as f:
+        tags = exifread.process_file(f, details = False)
+        # return tags
+
+    # On extrait l'information de l'EXIF
+    string = tags.get("Image DateTime", None)
+    
+    # Pas de date de prise de vue
+    if string is None: return None
+
+    # On a une date de prise de vue dans le format YYYY:MM:DD HH:mm:SS
+    string = str(tags["Image DateTime"])
+    string = string.split()
+    string = string[0].replace(":", "/") + " " + string[1]
+    return string
 
 def recherche(dossiers):
     """
@@ -56,9 +76,16 @@ def recherche(dossiers):
                 path = os.path.join(root, name)
                 c += 1
 
-                # On calcule le MD5 et on insère dans la BDD
+                # Détermination du MD5
                 MD5 = md5(path)
-                cur.execute(SQL, (path, MD5))
+
+                # Détermination de la date de prise de vue
+                datePriseDeVue = None
+                if path.lower().endswith("jpeg") or path.lower().endswith("jpg"):
+                    datePriseDeVue = date(path)
+
+                # Insertion dans la base de données
+                cur.execute(SQL, (path, MD5, datePriseDeVue))
 
                 # On sauvegarde si nécessaire
                 if c % 50 == 0:
