@@ -7,8 +7,9 @@ import os
 import sqlite3
 import sys
 import json
-import exifread
+import datetime
 import time
+import exifread
 
 nomBDD = time.strftime("%Y-%m-%d %H-%M") + ".s3db"
 nomBDD = "Fichiers.s3db"
@@ -40,10 +41,21 @@ def md5(fname):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
 
+with open("config.json", 'rb') as j:
+    exceptions = json.loads(j.read().decode()).get("Exceptions", dict())
+
 def date(fichier):
     with open(fichier, 'rb') as f:
         tags = exifread.process_file(f, details = False)
-        # return tags
+    
+    # On sait que le fichier n'a pas de date de prise de vue
+    # On agit en conséquence
+    if fichier in exceptions:
+        if exceptions[fichier] == "mtime":
+            timestamp = os.path.getmtime(fichier)
+            return datetime.datetime.fromtimestamp(timestamp).strftime("%Y/%m/%d %H:%M")
+        else:
+            raise Exception("Mauvaise exception dans la configuration pour '{}'".format(fichier))
 
     # On extrait l'information de l'EXIF
     string = tags.get("Image DateTime", None)
@@ -53,14 +65,21 @@ def date(fichier):
 
     # On a une date de prise de vue dans le format YYYY:MM:DD HH:mm:SS
     string = str(tags["Image DateTime"])
-    if "T" in string: # Format : YYYY-MM-DDTHH:MM:SS+Offset:
-        string = string.split("T")
-        string = string[0].replace("-", "/") + " " + string[1].split("+")[0]
-        return string
-    else:             # Format : YYYY:MM:DD HH:MM:SS
-        string = string.split()
-        string = string[0].replace(":", "/") + " " + string[1]
-        return string
+    try:
+        if "T" in string: # Format : YYYY-MM-DDTHH:MM:SS+Offset:
+            string = string.split("T")
+            string = string[0].replace("-", "/") + " " + string[1].split("+")[0]
+            return string
+        else:             # Format : YYYY:MM:DD HH:MM:SS
+            string = string.split()
+            string = string[0].replace(":", "/") + " " + string[1]
+            return string
+    except Exception as e:
+        with open("log.txt", 'wb') as f:
+            f.write(str(tags).encode())
+        print("Fichier : '{}'".format(fichier))
+        print("Valeur  : {}".format(str(tags["Image DateTime"])))
+        raise Exception("Impossible d'extraire la date de prise de vue.")
 
 def recherche(dossiers):
     """
