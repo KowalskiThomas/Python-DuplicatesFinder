@@ -8,6 +8,9 @@ import sqlite3
 import sys
 import json
 import exifread
+import time
+
+nomBDD = time.strftime("%Y-%m-%d %H-%M") + ".s3db"
 
 def init():
     """
@@ -17,7 +20,7 @@ def init():
     db = sqlite3.connect("Fichiers.s3db")
     cur = db.cursor()
 
-    SQL = "CREATE TABLE Fichiers (Chemin TEXT, MD5 TEXT, Date TEXT)"
+    SQL = "CREATE TABLE Fichiers (Chemin TEXT, MD5 TEXT, Date TEXT, Size INTEGER)"
     # On lance la requête, qui lève une exception si la table existe déjà
     try:
         cur.execute(SQL)
@@ -36,11 +39,9 @@ def md5(fname):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
 
-SQL = "INSERT INTO Fichiers VALUES (?, ?, ?)"
+SQL = "INSERT INTO Fichiers VALUES (?, ?, ?, ?)"
 
-def date(fichier):
-    print("Recherche de la date pour '{}'".format(fichier))
-    
+def date(fichier):    
     with open(fichier, 'rb') as f:
         tags = exifread.process_file(f, details = False)
         # return tags
@@ -84,11 +85,15 @@ def recherche(dossiers):
                 if path.lower().endswith("jpeg") or path.lower().endswith("jpg"):
                     datePriseDeVue = date(path)
 
+                # Détermination de la taille du fichier
+                taille = os.stat(path).st_size
+
                 # Insertion dans la base de données
-                cur.execute(SQL, (path, MD5, datePriseDeVue))
+                cur.execute(SQL, (path, MD5, datePriseDeVue, taille))
 
                 # On sauvegarde si nécessaire
                 if c % 50 == 0:
+                    print("{} fichiers trouvés.".format(c))
                     db.commit()
 
     db.commit()
