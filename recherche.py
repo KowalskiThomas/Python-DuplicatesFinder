@@ -39,16 +39,14 @@ def md5(fname):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
 
-SQL = "INSERT INTO Fichiers VALUES (?, ?, ?, ?)"
-
-def date(fichier):    
+def date(fichier):
     with open(fichier, 'rb') as f:
         tags = exifread.process_file(f, details = False)
         # return tags
 
     # On extrait l'information de l'EXIF
     string = tags.get("Image DateTime", None)
-    
+
     # Pas de date de prise de vue
     if string is None: return None
 
@@ -65,16 +63,36 @@ def recherche(dossiers):
     """
     db, cur = init()
 
+    # On récupère la liste des fichiers déjà traités
+    SQL = "SELECT Chemin FROM Fichiers"
+    dejaTrouve = [x[0] for x in cur.execute(SQL).fetchall()]
+
+    # Instruction SQL pour l'insertion
+    SQL = "INSERT INTO Fichiers VALUES (?, ?, ?, ?)"
+
     # On recherche dans chaque dossier racine de dossiers
     for dossier in dossiers:
         # c est utilisé pour compter les fichiers trouvés : on commit tous les 50
-        c = 0
+        c = len(dejaTrouve)
 
         print("Recherche dans '{}'".format(dossier))
         for root, dirs, files in os.walk(dossier, topdown = False):
             print("\tRecherche dans '{}'".format(root))
             for name in files:
+                # On trouve le chemin complet du fichier
                 path = os.path.join(root, name)
+
+                # Pour permettre de réduire la complexité liée à la recherche dans dejaTrouve au cours du temps,
+                # on supprime petit à petit les chemins qu'on a déjà vus
+                try:
+                    indice = dejaTrouve.index(path)
+                    del dejaTrouve[indice]
+                    continue
+                except ValueError:
+                    # On n'a pas déjà traité ce chemin
+                    pass
+
+                # Incrémentation du compteur de fichiers
                 c += 1
 
                 # Détermination du MD5
@@ -106,10 +124,24 @@ if __name__ == "__main__":
     # Aucun argument donné
     if not args:
         print("Merci de bien vouloir appeler le script comme ceci :")
-        print("python recherche.py dossier1 dossier2 dossier3")
+        print("python [config] [reset] recherche.py dossier1 dossier2 dossier3")
         sys.exit(0)
     # Argument 'config' : on charge depuis config.json
-    elif args[0] == "config":
+    else:
+        # Suppression d'une base de données existante
+        if "reset" in args:
+            print("Suppression de la base de données.")
+            if os.path.isfile("Fichiers.s3db"):
+                os.unlink("Fichiers.s3db")
+            if len(args) == 1:
+                print("Merci de bien vouloir appeler le script comme ceci :")
+                print("python [config] [reset] recherche.py dossier1 dossier2 dossier3")
+                sys.exit(0)
+
+            # On supprime l'argument reset qui serait mal interprété comme un dossier :
+            del args[args.index("reset")]
+
+    if args[0] == "config":
         # On essaie de charger la configuration
         # Si ça rate, on détaille pas le problème.
         # L'utilisateur a qu'à se débrouiller
