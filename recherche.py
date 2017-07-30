@@ -11,6 +11,7 @@ import exifread
 import time
 
 nomBDD = time.strftime("%Y-%m-%d %H-%M") + ".s3db"
+nomBDD = "Fichiers.s3db"
 
 def init():
     """
@@ -52,9 +53,14 @@ def date(fichier):
 
     # On a une date de prise de vue dans le format YYYY:MM:DD HH:mm:SS
     string = str(tags["Image DateTime"])
-    string = string.split()
-    string = string[0].replace(":", "/") + " " + string[1]
-    return string
+    if "T" in string: # Format : YYYY-MM-DDTHH:MM:SS+Offset:
+        string = string.split("T")
+        string = string[0].replace("-", "/") + " " + string[1].split("+")[0]
+        return string
+    else:             # Format : YYYY:MM:DD HH:MM:SS
+        string = string.split()
+        string = string[0].replace(":", "/") + " " + string[1]
+        return string
 
 def recherche(dossiers):
     """
@@ -75,9 +81,7 @@ def recherche(dossiers):
         # c est utilisé pour compter les fichiers trouvés : on commit tous les 50
         c = len(dejaTrouve)
 
-        print("Recherche dans '{}'".format(dossier))
         for root, dirs, files in os.walk(dossier, topdown = False):
-            print("\tRecherche dans '{}'".format(root))
             for name in files:
                 # On trouve le chemin complet du fichier
                 path = os.path.join(root, name)
@@ -111,7 +115,9 @@ def recherche(dossiers):
 
                 # On sauvegarde si nécessaire
                 if c % 50 == 0:
-                    print("{} fichiers trouvés.".format(c))
+                    heure = time.strftime("%H:%M")
+                    print("{} : {} fichiers trouvés.".format(heure, c))
+                    print("        Dossier actuel : '{}'".format(root))
                     db.commit()
 
     db.commit()
