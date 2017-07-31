@@ -1,5 +1,29 @@
 {
-    "Dossiers" : [
+    "Dossiers" : 
+    [
         "D:\\Users\\Thomas\\Pictures\\"
+    ],
+    "Exceptions" :
+    {
+        "D:\\Users\\Thomas\\Pictures\\Images\\2011\\Téléphone\\Août\\Août 046.jpg" : "mtime",
+        "D:\\Users\\Thomas\\Pictures\\Images\\2011\\Vacances Juillet-Août\\Téléphone Septembre\\Téléphone Septembre 054.jpg" : "mtime",
+        "D:\\Users\\Thomas\\Pictures\\Images\\Ancien Ordinateur\\2011\\Téléphone\\Août\\Août 046.jpg" : "mtime",
+        "D:\\Users\\Thomas\\Pictures\\Images\\Ancien Ordinateur\\2011\\Vacances Juillet-Août\\Téléphone Septembre\\Téléphone Septembre 054.jpg" : "mtime",  
+        "D:\\Users\\Thomas\\Pictures\\Images Ancien Ordinateur\\2011\\Téléphone\\Août\\Août 046.jpg" : "mtime",
+        "D:\\Users\\Thomas\\Pictures\\Images Ancien Ordinateur\\2011\\Vacances Juillet-Août\\Téléphone Septembre\\Téléphone Septembre 054.jpg" : "mtime"
+    },
+    "MediaExtensions" :
+    [
+        "jpg",
+        "jpeg",
+        "gif",
+        "png",
+        "bmp",
+
+        "mp4",
+        "mpeg",
+        "mpg",
+
+        "mp3"
     ]
 }

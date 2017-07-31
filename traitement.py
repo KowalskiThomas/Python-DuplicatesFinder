@@ -4,16 +4,23 @@ On récupère les données stockées dans la BDD et on fait des choses intéress
 """
 
 import sqlite3
+import os
+import json
 
-def traitement():
+def connect():
+    # On se connecte à la base de données et on récupère le curseur
+    db = sqlite3.connect("Fichiers.s3db")
+    cur = db.cursor()
+
+    return db, cur
+
+def rapport():
     """
     Ouvre la base de données et cherche les doublons à partir de celle-ci.
     Ecrit dans un fichier log.txt au fur et à mesure que la fonction trouve les doublons.
     """
 
-    # On se connecte à la base de données et on récupère le curseur
-    db = sqlite3.connect("Fichiers.s3db")
-    cur = db.cursor()
+    db, cur = connect()
 
     # On récupère les lignes en les groupant par MD5
     # On ne récupère que les groupes qui ont au moins deux éléments
@@ -46,6 +53,66 @@ def traitement():
 
     f.close()
 
-# Si on appelle le fichier directement (pas appelé si on importe le module)
-if __name__ == "__main__":
-    traitement()
+def nomsDesDossiers():
+    db, cur = connect()
+
+    SQL = "SELECT Chemin FROM Fichiers GROUP BY MD5"
+    donnees = cur.execute(SQL).fetchall()
+
+    exclusion = [
+        "lrdata"
+    ]
+
+    dossiers = set()
+    for ligne in donnees:
+        chemin = ligne[0]
+        
+        for ex in exclusion:
+            if ex in chemin:
+                break
+        else:
+            dossiers.add(os.path.dirname(chemin))
+
+    with open("dossiers.txt", "wb") as f:
+        for dossier in dossiers:
+            f.write(dossier.encode())
+            f.write("\n".encode())
+
+def reorganisation():
+    db, cur = connect()
+
+    dossiers = set()
+
+    SQL = "SELECT * FROM Fichiers"
+    resultats = cur.execute(SQL).fetchall()
+
+    for chemin, _, _, _, _ in resultats:
+        dossiers.add(os.path.dirname(chemin))
+
+    # Détermination du pourcentage de doublons dans chaque dossier
+    SQL = """SELECT * FROM Fichiers
+             WHERE Chemin LIKE "{}%"
+          """
+
+    # Maintenant qu'on a un ensemble de dossiers, on le transforme en dictionnaire pour pouvoir stocker les pourcentages de doublons
+    dossiers = {dossier : 0 for dossier in dossiers}
+    for dossier in dossiers:
+        fichiers = cur.execute(SQL.format(dossier)).fetchall()
+
+        totalFichiers = len(fichiers)
+        totalDoublons = 0
+
+        SQL2 = "SELECT * FROM Fichiers WHERE MD5 = ?"
+        for chemin, md5, _, _, _ in fichiers:
+            doublons = cur.execute(SQL2, (md5, )).fetchall()
+
+            if len(doublons) > 1:
+                totalDoublons += 1
+
+        ratio = totalDoublons / totalFichiers
+        dossiers[dossier] = ratio
+
+    with open("dossiers.json") as f:
+        json.dump(dossiers, f)
+
+reorganisation()

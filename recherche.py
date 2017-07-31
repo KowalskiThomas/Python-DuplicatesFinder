@@ -22,7 +22,7 @@ def init():
     db = sqlite3.connect("Fichiers.s3db")
     cur = db.cursor()
 
-    SQL = "CREATE TABLE Fichiers (Chemin TEXT, MD5 TEXT, Date TEXT, Size INTEGER)"
+    SQL = "CREATE TABLE Fichiers (Chemin TEXT, MD5 TEXT, Date TEXT, DateModification TEXT, Taille INTEGER)"
     # On lance la requête, qui lève une exception si la table existe déjà
     try:
         cur.execute(SQL)
@@ -45,12 +45,24 @@ with open("config.json", 'rb') as j:
     exceptions = json.loads(j.read().decode()).get("Exceptions", dict())
 
 def date(fichier):
+    def stringVersInt(s):
+        """
+        Renvoie `int(s)` si c'est possible, sinon `0`.
+        """
+        try:
+            i = int(s)
+            return i
+        except:
+            return 0
+
+    fichier = fichier.strip()
+
     with open(fichier, 'rb') as f:
         tags = exifread.process_file(f, details = False)
     
     # On sait que le fichier n'a pas de date de prise de vue
     # On agit en conséquence
-    if fichier in exceptions:
+    if fichier in exceptions.keys():
         if exceptions[fichier] == "mtime":
             timestamp = os.path.getmtime(fichier)
             return datetime.datetime.fromtimestamp(timestamp).strftime("%Y/%m/%d %H:%M")
@@ -70,7 +82,11 @@ def date(fichier):
             string = string.split("T")
             string = string[0].replace("-", "/") + " " + string[1].split("+")[0]
             return string
+        elif str(stringVersInt(string)) == string: # Format timestamp UNIX
+            string = int(int(string) / 1000)
+            return datetime.datetime.fromtimestamp(string).strftime("%Y/%m/%d %H:%M")
         else:             # Format : YYYY:MM:DD HH:MM:SS
+            string2 = string
             string = string.split()
             string = string[0].replace(":", "/") + " " + string[1]
             return string
@@ -93,7 +109,7 @@ def recherche(dossiers):
     dejaTrouve = [x[0] for x in cur.execute(SQL).fetchall()]
 
     # Instruction SQL pour l'insertion
-    SQL = "INSERT INTO Fichiers VALUES (?, ?, ?, ?)"
+    SQL = "INSERT INTO Fichiers VALUES (?, ?, ?, ?, ?)"
 
     # On recherche dans chaque dossier racine de dossiers
     for dossier in dossiers:
@@ -126,11 +142,14 @@ def recherche(dossiers):
                 if path.lower().endswith("jpeg") or path.lower().endswith("jpg"):
                     datePriseDeVue = date(path)
 
+                # Détermination de la date de modification
+                mtime = os.path.getmtime(path)
+
                 # Détermination de la taille du fichier
                 taille = os.stat(path).st_size
 
                 # Insertion dans la base de données
-                cur.execute(SQL, (path, MD5, datePriseDeVue, taille))
+                cur.execute(SQL, (path, MD5, datePriseDeVue, mtime, taille))
 
                 # On sauvegarde si nécessaire
                 if c % 50 == 0:
